@@ -347,49 +347,50 @@ export function CameraScreen({ onSuccess }: CameraScreenProps) {
   return (
     <div className="min-h-screen bg-[#0a0c14] flex flex-col items-center justify-center">
 
-      {/* Hidden Video */}
-      <video ref={videoRef} style={{ display: "none" }} />
-
       <h2 className="text-white text-2xl font-semibold mb-2">
         Face Authentication
       </h2>
 
-      <p
-        className={`mb-6 text-center text-sm ${
-          status === "error" ? "text-red-400" : "text-gray-400"
-        }`}
-      >
+      <p className="text-gray-400 text-center text-sm mb-6">
         {status === "scanning" && "Align your face with camera"}
         {status === "processing" && "Verifying your identity..."}
         {status === "error" && errorMessage}
+        {status === "idle" && "Please wait..."}
       </p>
 
-      <div className="w-72 h-80 rounded-3xl flex flex-col items-center justify-center shadow-xl
-        bg-gradient-to-b from-gray-800 to-gray-900 border border-gray-700">
-
-        {/* 🔄 Loading */}
-        {(status === "processing" || status === "scanning") && (
-          <div className="text-center">
-            <div className="w-14 h-14 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-300 text-sm">
-              {status === "processing" ? "Processing..." : "Scanning..."}
-            </p>
+      {/* Camera Feed - always visible */}
+      <div className="w-80 h-96 rounded-2xl overflow-hidden border-2 border-primary/30 relative">
+        <video 
+          ref={videoRef} 
+          autoPlay 
+          playsInline 
+          muted
+          className="w-full h-full object-cover"
+        />
+        
+        {/* Scanning overlay */}
+        {(status === "scanning" || status === "processing") && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <div className="bg-black/60 px-4 py-2 rounded-full">
+              <p className="text-white text-sm">
+                {status === "processing" ? "Verifying..." : "Align your face"}
+              </p>
+            </div>
           </div>
         )}
-
-        {/* ❌ Error */}
+        
+        {/* Error overlay */}
         {status === "error" && (
-          <div className="text-center px-4">
-            <div className="text-red-400 text-4xl mb-3">⚠️</div>
-            <p className="text-red-300 text-sm font-medium">
-              {errorMessage}
-            </p>
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+            <p className="text-red-400 text-sm px-4 text-center">{errorMessage}</p>
           </div>
         )}
-
-        {/* Idle */}
+        
+        {/* Idle state */}
         {status === "idle" && (
-          <p className="text-gray-500">Initializing...</p>
+          <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
+            <p className="text-gray-500 text-sm">Initializing camera...</p>
+          </div>
         )}
       </div>
     </div>

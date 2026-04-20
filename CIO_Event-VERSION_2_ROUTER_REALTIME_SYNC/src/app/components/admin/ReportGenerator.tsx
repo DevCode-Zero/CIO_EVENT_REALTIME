@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { FileText, Download, Calendar, Users, TrendingUp, BarChart3, Loader2 } from "lucide-react";
 import { db } from "../../utils/database";
+import { supabase, PRESENCE_CHANNEL } from "../../utils/supabaseClient";
 
 export function ReportGenerator() {
   const [loading, setLoading] = useState(true);
@@ -10,6 +11,7 @@ export function ReportGenerator() {
     totalCheckedIn: 0,
     totalQuestions: 0,
     totalResponses: 0,
+    peakAttendance: 0,
   });
   const [topInsights, setTopInsights] = useState<Array<{
     question: string;
@@ -19,6 +21,51 @@ export function ReportGenerator() {
 
   useEffect(() => {
     loadReportData();
+    
+    // Track live users with faster sync
+    const channel = supabase.channel(PRESENCE_CHANNEL, {
+      config: {
+        presence: { key: 'report-admin' }
+      }
+    });
+    
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      console.log("[ReportGenerator] Presence:", state);
+      const allPresences = Object.values(state).flat() as { user_id?: string }[];
+      const guestUsers = allPresences
+        .map(p => p.user_id)
+        .filter(Boolean)
+        .filter(id => !id.includes('-admin'));
+      const liveCount = new Set(guestUsers).size;
+      
+      console.log("[ReportGenerator] Live count:", liveCount);
+      
+      setStats(prev => {
+        const newPeak = Math.max(prev.peakAttendance, liveCount);
+        return {
+          ...prev,
+          totalCheckedIn: liveCount,
+          peakAttendance: newPeak,
+        };
+      });
+    });
+
+    channel.subscribe((status) => {
+      console.log("[ReportGenerator] Channel status:", status);
+      if (status === 'SUBSCRIBED') {
+        channel.track({ user_id: 'report-admin' });
+        
+        // Force sync after 1 second
+        setTimeout(() => {
+          channel.track({ user_id: 'report-admin' });
+        }, 1000);
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadReportData = async () => {
@@ -30,12 +77,21 @@ export function ReportGenerator() {
         db.getTotalResponses(),
       ]);
 
-      const checkedIn = attendees.filter(a => a.checked_in_at).length;
+      // Count today's check-ins for initial peak
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayCheckins = attendees.filter(a => {
+        if (!a.checked_in_at) return false;
+        const checkInDate = new Date(a.checked_in_at);
+        return checkInDate >= today;
+      }).length;
+      
       setStats({
         totalInvited: attendees.length,
-        totalCheckedIn: checkedIn,
+        totalCheckedIn: 0, // Will be updated by presence
         totalQuestions: questions.length,
         totalResponses: responses,
+        peakAttendance: todayCheckins,
       });
 
       const sentQuestions = questions.filter(q => q.status === "sent" || q.status === "completed");
@@ -183,7 +239,7 @@ export function ReportGenerator() {
             <p className="text-muted-foreground mb-1" style={{ fontSize: "0.75rem" }}>
               Peak Attendance
             </p>
-            <p style={{ fontSize: "1.75rem", fontWeight: 600 }}>{stats.totalCheckedIn}</p>
+            <p style={{ fontSize: "1.75rem", fontWeight: 600 }}>{stats.peakAttendance}</p>
           </div>
         </div>
       </motion.div>

@@ -131,23 +131,24 @@ export function DashboardScreen({ name, onQuestionClick, onNotificationClick, pu
       const mapped = meetings.map((m) => ({
         time: m.start_time,
         title: m.title,
+        description: m.description || "",
+        location: m.location || "",
         type: "session",
         status: getMeetingStatus(m.start_time, m.end_time),
-        speaker: m.location || "",
       }));
       setAgenda(mapped.length > 0 ? mapped : [
-        { time: "08:00", title: "Registration & Breakfast", type: "meal", status: "completed" },
-        { time: "09:00", title: "Opening Keynote", type: "session", status: "current", speaker: "Main Hall" },
-        { time: "10:30", title: "AI Strategy Panel", type: "session", status: "upcoming", speaker: "Conference Room A" },
-        { time: "12:00", title: "Networking Lunch", type: "meal", status: "upcoming", speaker: "Dining Hall" },
+        { time: "08:00", title: "Registration & Breakfast", description: "Check in and enjoy breakfast", location: "Main Lobby", type: "meal", status: "completed" },
+        { time: "09:00", title: "Opening Keynote", description: "Welcome address and keynote speech", location: "Main Hall", type: "session", status: "current" },
+        { time: "10:30", title: "AI Strategy Panel", description: "Industry leaders discuss AI implementation", location: "Conference Room A", type: "session", status: "upcoming" },
+        { time: "12:00", title: "Networking Lunch", description: "Lunch and networking opportunity", location: "Dining Hall", type: "meal", status: "upcoming" },
       ]);
     } catch (err) {
       console.error("Failed to load meetings:", err);
       setAgenda([
-        { time: "08:00", title: "Registration & Breakfast", type: "meal", status: "completed" },
-        { time: "09:00", title: "Opening Keynote", type: "session", status: "current", speaker: "Main Hall" },
-        { time: "10:30", title: "AI Strategy Panel", type: "session", status: "upcoming", speaker: "Conference Room A" },
-        { time: "12:00", title: "Networking Lunch", type: "meal", status: "upcoming", speaker: "Dining Hall" },
+        { time: "08:00", title: "Registration & Breakfast", description: "Check in and enjoy breakfast", location: "Main Lobby", type: "meal", status: "completed" },
+        { time: "09:00", title: "Opening Keynote", description: "Welcome address and keynote speech", location: "Main Hall", type: "session", status: "current" },
+        { time: "10:30", title: "AI Strategy Panel", description: "Industry leaders discuss AI implementation", location: "Conference Room A", type: "session", status: "upcoming" },
+        { time: "12:00", title: "Networking Lunch", description: "Lunch and networking opportunity", location: "Dining Hall", type: "meal", status: "upcoming" },
       ]);
     }
   };
@@ -377,9 +378,14 @@ export function DashboardScreen({ name, onQuestionClick, onNotificationClick, pu
                   >
                     {item.title}
                   </p>
-                  {item.speaker && (
+                  {item.description && (
                     <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>
-                      {item.speaker}
+                      {item.description}
+                    </p>
+                  )}
+                  {item.location && (
+                    <p className="text-primary/70 mt-1" style={{ fontSize: "0.75rem" }}>
+                      📍 {item.location}
                     </p>
                   )}
                 </div>

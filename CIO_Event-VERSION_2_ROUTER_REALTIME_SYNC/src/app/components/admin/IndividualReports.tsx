@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Search, User, CheckCircle2, Clock, Download, ArrowLeft, FileText } from "lucide-react";
+import { Search, User, CheckCircle2, Download, ArrowLeft, FileText } from "lucide-react";
 import { db, type Attendee, type Question } from "../../utils/database";
+import { supabase, PRESENCE_CHANNEL } from "../../utils/supabaseClient";
 
 interface AttendeeResponse {
   questionId: string;
@@ -20,9 +21,39 @@ export function IndividualReports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingResponses, setLoadingResponses] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   useEffect(() => {
     loadAttendees();
+    
+    // Track online users
+    const channel = supabase.channel(PRESENCE_CHANNEL, {
+      config: {
+        presence: { key: 'individual-reports-admin' }
+      }
+    });
+    
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users = Object.values(state).flat() as { user_id: string }[];
+      const names = users.map(u => u.user_id).filter(Boolean);
+      setOnlineUsers(names);
+    });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.track({ user_id: 'individual-reports-admin' });
+        
+        // Force sync after 1 second
+        setTimeout(() => {
+          channel.track({ user_id: 'individual-reports-admin' });
+        }, 1000);
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadAttendees = async () => {
@@ -279,15 +310,10 @@ export function IndividualReports() {
                     {attendee.company}
                   </p>
                   <div className="flex items-center gap-2 mt-2">
-                    {attendee.checked_in_at ? (
+                    {onlineUsers.includes(attendee.name) && (
                       <span className="flex items-center gap-1 text-[#10b981]" style={{ fontSize: "0.75rem" }}>
                         <CheckCircle2 className="w-3 h-3" />
                         Checked In
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
-                        <Clock className="w-3 h-3" />
-                        Pending
                       </span>
                     )}
                   </div>

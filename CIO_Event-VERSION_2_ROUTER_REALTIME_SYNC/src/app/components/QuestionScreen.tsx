@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, CheckCircle2, MessageSquare } from "lucide-react";
 import { type PushedQuestion } from "../utils/questionEvents";
 import { db } from "../utils/database";
 import { type Attendee } from "../utils/database";
+import { supabase, REALTIME_CHANNEL } from "../utils/supabaseClient";
 
 interface QuestionScreenProps {
   onBack: () => void;
@@ -62,7 +63,13 @@ export function QuestionScreen({ onBack }: QuestionScreenProps) {
     };
 
     loadQuestion();
+    
+    const channel = supabase.channel(REALTIME_CHANNEL);
+    channel.subscribe();
+    channelRef.current = channel;
   }, []);
+  
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const handleSubmit = async () => {
     if (!attendee || !question) return;
@@ -70,6 +77,14 @@ export function QuestionScreen({ onBack }: QuestionScreenProps) {
     if (question.type === "multiple-choice" && selectedAnswer !== null) {
       try {
         await db.addResponse(question.id, attendee.id, selectedAnswer, undefined, attendee.name);
+        
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'response-submitted',
+            payload: { questionId: question.id, attendeeName: attendee.name },
+          });
+        }
       } catch (err) {
         console.error("Failed to save response:", err);
       }
@@ -80,6 +95,14 @@ export function QuestionScreen({ onBack }: QuestionScreenProps) {
     } else if (question.type === "text" && textResponse.trim()) {
       try {
         await db.addResponse(question.id, attendee.id, undefined, textResponse, attendee.name);
+        
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'response-submitted',
+            payload: { questionId: question.id, attendeeName: attendee.name },
+          });
+        }
       } catch (err) {
         console.error("Failed to save response:", err);
       }

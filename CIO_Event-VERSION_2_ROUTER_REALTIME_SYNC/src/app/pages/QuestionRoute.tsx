@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, CheckCircle2, MessageSquare } from "lucide-react";
@@ -103,10 +103,15 @@ export function QuestionRoute() {
       })
       .subscribe();
 
+    // Store channel for use in handleSubmit
+    channelRef.current = channel;
+
     return () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const handleSubmit = async () => {
     if (!attendee || !question) return;
@@ -115,6 +120,15 @@ export function QuestionRoute() {
       try {
         await db.addResponse(question.id, attendee.id, selectedAnswer, undefined, attendee.name);
         console.log("Response saved for:", attendee.name);
+        
+        // Broadcast response submission for instant update
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'response-submitted',
+            payload: { questionId: question.id, attendeeName: attendee.name },
+          });
+        }
       } catch (err) {
         console.error("Failed to save response:", err);
       }
@@ -126,6 +140,15 @@ export function QuestionRoute() {
       try {
         await db.addResponse(question.id, attendee.id, undefined, textResponse, attendee.name);
         console.log("Response saved for:", attendee.name);
+        
+        // Broadcast response submission for instant update
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'response-submitted',
+            payload: { questionId: question.id, attendeeName: attendee.name },
+          });
+        }
       } catch (err) {
         console.error("Failed to save response:", err);
       }

@@ -31,6 +31,10 @@ export function QuestionManager() {
       .on('broadcast', { event: 'question-push' }, (payload) => {
         console.log("[Admin] Admin received own broadcast:", payload);
       })
+      .on('broadcast', { event: 'response-submitted' }, (payload) => {
+        console.log("[Admin] Response submitted:", payload);
+        loadQuestions();
+      })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'responses' },

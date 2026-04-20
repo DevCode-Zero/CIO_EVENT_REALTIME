@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, CheckCircle2, Clock, User, MapPin, RefreshCw, Plus, X, Pencil, Trash2, Upload, Image, UploadCloud, FileImage } from "lucide-react";
 import * as XLSX from "xlsx";
-import { supabase } from "../../utils/supabaseClient";
+import { supabase, PRESENCE_CHANNEL } from "../../utils/supabaseClient";
 import { db, type Attendee } from "../../utils/database";
 
 export function AttendeesList() {
@@ -23,6 +23,7 @@ export function AttendeesList() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [previewImage, setPreviewImage] = useState<File | null>(null);
   const previewInputRef = useRef<HTMLInputElement>(null);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   const loadAttendees = async () => {
     try {
@@ -53,6 +54,39 @@ export function AttendeesList() {
         }
       )
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Track online users
+  useEffect(() => {
+    const channel = supabase.channel(PRESENCE_CHANNEL, {
+      config: {
+        presence: { key: 'attendees-list-admin' }
+      }
+    });
+    
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users = Object.values(state).flat() as { user_id: string; online_at: string }[];
+      const names = users.map(u => u.user_id).filter(Boolean);
+      console.log("[AttendeesList] Online users:", names);
+      setOnlineUsers(names);
+    });
+
+    channel.subscribe((status, err) => {
+      console.log("[AttendeesList] Subscription:", status, err);
+      if (status === 'SUBSCRIBED') {
+        channel.track({ user_id: 'attendees-list-admin' }).catch(e => console.error(e));
+        
+        // Force sync after 1 second
+        setTimeout(() => {
+          channel.track({ user_id: 'attendees-list-admin' });
+        }, 1000);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
@@ -301,7 +335,7 @@ const uploadAllImages = async () => {
             Attendees
           </h2>
           <p className="text-muted-foreground" style={{ fontSize: "0.9375rem" }}>
-            {attendees.length} registered • {attendees.filter(a => a.checked_in_at).length} checked in
+            {attendees.length} registered • {onlineUsers.filter(u => !u.includes('-admin')).length} checked in
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -422,13 +456,12 @@ const uploadAllImages = async () => {
                     </div>
 
 {(() => {
-                      if (!attendee.checked_in_at) return null;
-                      const checkInTime = new Date(attendee.checked_in_at);
-                      const now = new Date();
-                      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                      const checkInDate = new Date(checkInTime.getFullYear(), checkInTime.getMonth(), checkInTime.getDate());
+                      const isOnline = onlineUsers.some(name => 
+                        attendee.name.toLowerCase().includes(name.toLowerCase()) ||
+                        name.toLowerCase().includes(attendee.name.toLowerCase())
+                      );
                       
-                      if (checkInDate.getTime() === today.getTime()) {
+                      if (isOnline) {
                         return (
                           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
                             <CheckCircle2 className="w-4 h-4 text-primary" />

@@ -10,6 +10,7 @@ export function StatsOverview() {
   const [questionsPushed, setQuestionsPushed] = useState(0);
   const [totalResponses, setTotalResponses] = useState(0);
   const [liveUsers, setLiveUsers] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -18,9 +19,8 @@ export function StatsOverview() {
         const questions = await db.getQuestions();
         const responses = await db.getTotalResponses();
         
-        setTotalAttendees(attendees.length);
-        setCheckedIn(attendees.filter(a => a.checked_in_at).length);
-        setQuestionsPushed(questions.filter(q => q.status === "sent").length);
+        setTotalAttendees(attendees?.length || 0);
+        setQuestionsPushed(questions?.filter(q => q.status === "sent").length || 0);
         setTotalResponses(responses);
       } catch (err) {
         console.error("Failed to load stats:", err);
@@ -33,23 +33,41 @@ export function StatsOverview() {
     return () => clearInterval(interval);
   }, []);
 
+  // Track live users with presence - also updates "Checked In"
   useEffect(() => {
-    const channel = supabase.channel(PRESENCE_CHANNEL);
+    const channel = supabase.channel(PRESENCE_CHANNEL, {
+      config: {
+        presence: { key: 'stats-admin' }
+      }
+    });
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const userCount = Object.values(state).flat().length;
-        setLiveUsers(userCount);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: Math.random().toString(36).substring(7),
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const allPresences = Object.values(state).flat() as { user_id?: string }[];
+      const guestUsers = allPresences
+        .map(p => p.user_id)
+        .filter(Boolean)
+        .filter(id => !id.includes('-admin'));
+      const uniqueGuests = new Set(guestUsers);
+      console.log("[StatsOverview] Live guests:", uniqueGuests.size, Array.from(uniqueGuests));
+      setLiveUsers(uniqueGuests.size);
+      setCheckedIn(uniqueGuests.size); // Same as live users
+    });
+
+    channel.subscribe((status, err) => {
+      console.log("[StatsOverview] Subscription status:", status, err);
+      if (status === 'SUBSCRIBED') {
+        channel.track({ user_id: 'stats-admin' }).catch(e => console.error("[StatsOverview] Track error:", e));
+        
+        // Force sync after 1 second
+        setTimeout(() => {
+          channel.track({ user_id: 'stats-admin' });
+        }, 1000);
+      }
+      if (status === 'CHANNEL_ERROR') {
+        console.error("[StatsOverview] Channel error:", err);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
