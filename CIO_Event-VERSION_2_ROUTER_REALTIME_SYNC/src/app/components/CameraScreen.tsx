@@ -265,13 +265,31 @@ export function CameraScreen({ onSuccess }: CameraScreenProps) {
       const formData = new FormData();
       formData.append("image", blob);
 
-      const res = await fetch("http://localhost:5001/api/recognize", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await res.json();
-      console.log("API:", data);
+      // Face recognition API URL
+      const faceApiUrl = "http://localhost:5001/api/recognize";
+      console.log("Face API URL:", faceApiUrl);
+      
+      let data;
+      try {
+        const res = await fetch(faceApiUrl, {
+          method: "POST",
+          body: formData
+        });
+        console.log("API response status:", res.status);
+        
+        data = await res.json();
+        console.log("API response:", data);
+        
+        // Handle API error responses
+        if (data.error) {
+          throw new Error(data.error);
+        }
+      } catch (err) {
+        console.error("API fetch error:", err);
+        setStatus("error");
+        setErrorMessage("Face recognition service not available: " + (err as Error).message);
+        return;
+      }
 
       // let finalName = "Guest";
 

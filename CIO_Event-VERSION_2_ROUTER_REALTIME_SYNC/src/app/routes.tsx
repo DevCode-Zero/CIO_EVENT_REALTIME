@@ -234,4 +234,15 @@ export const router = createBrowserRouter([
       { index: true, element: <MeetingProcesses /> },
     ],
   },
+  {
+    path: "*",
+    Component: () => (
+      <div className="min-h-screen bg-[#0a0c14] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-white text-2xl mb-4">Page Not Found</h1>
+          <a href="/" className="text-primary underline">Go Home</a>
+        </div>
+      </div>
+    ),
+  },
 ]);

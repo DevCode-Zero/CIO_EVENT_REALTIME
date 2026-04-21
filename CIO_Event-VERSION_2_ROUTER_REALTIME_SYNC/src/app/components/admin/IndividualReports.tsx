@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Search, User, CheckCircle2, Download, ArrowLeft, FileText } from "lucide-react";
+import { Search, User, CheckCircle2, Download, ArrowLeft, FileText, Clock } from "lucide-react";
 import { db, type Attendee, type Question } from "../../utils/database";
 import { supabase, PRESENCE_CHANNEL } from "../../utils/supabaseClient";
 
